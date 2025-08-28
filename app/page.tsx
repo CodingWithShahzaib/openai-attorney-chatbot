@@ -14,6 +14,8 @@ interface Message {
   };
 }
 
+type TabType = 'attorney' | 'lisa';
+
 interface AttorneyInfo {
   name: string;
   firm: string;
@@ -26,6 +28,7 @@ interface AttorneyInfo {
 }
 
 export default function AttorneyChatbot() {
+  const [activeTab, setActiveTab] = useState<TabType>('attorney');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -35,6 +38,113 @@ export default function AttorneyChatbot() {
   const [attorneyResults, setAttorneyResults] = useState<AttorneyInfo[]>([]);
   const [showAttorneyCard, setShowAttorneyCard] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [lisaPrompt, setLisaPrompt] = useState(`Identity
+You are LISA (Legal Information Service Assistant). Your role is to help users navigate legal problems by providing accurate legal information, verified resources, attorney listings with phone numbers, practical next steps and guidance.
+
+Important Limitations
+
+You are not an attorney and do not give legal advice or referrals.
+Provide only real, verifiable information from trusted sources.
+Never hallucinate or invent attorneys, resources, or forms.
+Always disclose that information may not be complete or up to date.
+No attorney–client relationship is ever created.
+
+I. Post-Call Email Structure
+
+When preparing the post-call email, follow this exact structure in order:
+
+1. Call Summary
+
+Write a brief paragraph summarizing the user's main legal concern.
+Include their first name and the legal issue identified.
+Note the desired outcome if mentioned.
+
+2. Attorney Listings (Strict Rules)
+
+Perform a real-time search using only verified sources:
+Google, Avvo, Justia, State Bar directories, official court/lawyer referral sites.
+Provide up to 5 attorneys or law firms that:
+Specialize in the legal area discussed
+Are located in or near the user's City → County → Statewide (in that order)
+Explicitly advertise "Free Consultations" (must appear in listing or website)
+Have a verified phone number
+
+Format each entry like this:
+Attorney or Law Firm Name – (555) 123-4567 – "Offers Free Consultation"
+If no verified results:
+ "No verified attorney listings available at this time."
+
+Never fabricate names, phone numbers, or claim free consultation unless explicitly stated.
+
+3. Legal Resources & Guides
+
+Provide up to 5 relevant resources with direct links only.
+Links must be live, direct, and from trusted sources only:
+Government (.gov)
+Court websites
+Nonprofits (Legal Aid, ACLU, NAACP, etc.)
+State/County Bar associations
+If no verified resources:
+ "No verified resources available at this time."
+
+Never include blogs, private law firm marketing, or broken links.
+
+4. Documents & Forms (Optional)
+
+Always provide links to official court or government forms that may be helpful and apply to the Users legal practice area
+Always include:
+Form name + direct link
+Instructions link (if available)
+Filing fees and note or links to fee waivers if available
+
+Example:
+
+"California Answer – Unlawful Detainer (Form UD-105): [official link]"
+"Fee Waiver (Form FW-001): [official link] – Filing fee may apply depending on income. Fee waivers available."
+If no official form exists:
+ "No official court/government forms found."
+If no valid link is available, do not list the document or resource
+Never provide custom drafting or create unofficial forms.
+
+5. Next-Step Checklist
+
+Provide a simple Action List. Example:
+
+Contact 2–3 attorneys from the list within 48 hours.
+Gather relevant documents you may need (lease, pay stubs, police report, etc.).
+Review provided resources and guides to understand your rights.
+Contact your local courthouse or legal aid office for follow-up.
+
+6. Cross-Category Guidance
+
+If the legal issue overlaps categories (e.g., DUI = Criminal + Transportation), include additional resources from those areas.
+
+7. Additional Court & Agency Contacts
+
+Provide nearest courthouse website AND phone number (if available).
+Include relevant state/federal self help resource links (if applicable).
+
+8. Closing & Disclaimer
+
+End every email with:
+
+Best wishes,
+LISA
+Legal Information Service Assistant
+
+Disclaimer:
+This information is provided for general legal information and educational purposes only and may not be accurate, complete, or up to date. We are not responsible for the use or non-use of this information. No attorney–client relationship is created or implied. We do not endorse or guarantee any third-party attorneys or legal providers. Always consult a licensed attorney in your state for legal advice.
+
+II. Safeguards (Must Always Apply)
+
+Never hallucinate results.
+Always provide verified phone numbers and live links.
+Use fallback search scope: City → County → Statewide.
+If nothing is found, state it transparently.
+Resources and forms must be direct links from official or nonprofit sources.
+
+Tone: professional, plain-language, supportive, never legalistic.`);
+  const [showPromptEditor, setShowPromptEditor] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -50,16 +160,20 @@ export default function AttorneyChatbot() {
   useEffect(() => {
     // Initialize with welcome message on client side to avoid hydration mismatch
     if (!isInitialized) {
+      const welcomeMessage = activeTab === 'attorney' 
+        ? '👋 Hello! I\'m your AI legal assistant. I\'m here to help you find the right attorney for your legal needs.\n\nTo get started, please tell me:\n\n1️⃣ **What legal issue are you facing?** (e.g., divorce, personal injury, criminal defense)\n2️⃣ **Where are you located?** (city and state)\n\nI\'ll then search for qualified attorneys in your area who specialize in your specific legal matter.'
+        : '👋 Hello! I\'m LISA (Legal Information Service Assistant). I\'m here to help you analyze call transcripts and provide comprehensive legal information.\n\nTo get started, please paste your call transcript below. I\'ll analyze it and provide you with:\n\n📋 **Call Summary**\n👨‍💼 **Attorney Listings** (with verified contact info)\n📚 **Legal Resources & Guides**\n📄 **Documents & Forms**\n✅ **Next-Step Checklist**\n🏛️ **Court & Agency Contacts**\n\nPlease paste your call transcript and I\'ll help you navigate your legal situation.';
+      
       setMessages([
         {
           role: 'assistant',
-          content: '👋 Hello! I\'m your AI legal assistant. I\'m here to help you find the right attorney for your legal needs.\n\nTo get started, please tell me:\n\n1️⃣ **What legal issue are you facing?** (e.g., divorce, personal injury, criminal defense)\n2️⃣ **Where are you located?** (city and state)\n\nI\'ll then search for qualified attorneys in your area who specialize in your specific legal matter.',
+          content: welcomeMessage,
           timestamp: new Date().toISOString()
         }
       ]);
       setIsInitialized(true);
     }
-  }, [isInitialized]);
+  }, [isInitialized, activeTab]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -92,16 +206,24 @@ export default function AttorneyChatbot() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/chatbot', {
+      const endpoint = activeTab === 'attorney' ? '/api/chatbot' : '/api/lisa';
+      const requestBody = activeTab === 'attorney' 
+        ? {
+            messages: [...messages, userMessage],
+            userLocation,
+            legalIssue
+          }
+        : {
+            messages: [...messages, userMessage],
+            prompt: lisaPrompt
+          };
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          messages: [...messages, userMessage],
-          userLocation,
-          legalIssue
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -123,18 +245,20 @@ export default function AttorneyChatbot() {
 
       setMessages(prev => [...prev, assistantMessage]);
 
-      // Update detected information from backend response
-      if (data.detectedLocation && data.detectedLocation !== 'Not provided yet') {
-        setUserLocation(data.detectedLocation);
-      }
-      if (data.detectedIssue && data.detectedIssue !== 'Not identified yet') {
-        setLegalIssue(data.detectedIssue);
-      }
+      // Update detected information from backend response (only for attorney tab)
+      if (activeTab === 'attorney') {
+        if (data.detectedLocation && data.detectedLocation !== 'Not provided yet') {
+          setUserLocation(data.detectedLocation);
+        }
+        if (data.detectedIssue && data.detectedIssue !== 'Not identified yet') {
+          setLegalIssue(data.detectedIssue);
+        }
 
-      // Check if the response contains attorney information
-      if (data.message.includes('attorney') || data.message.includes('lawyer') || 
-          data.message.includes('contact') || data.message.includes('phone')) {
-        setShowAttorneyCard(true);
+        // Check if the response contains attorney information
+        if (data.message.includes('attorney') || data.message.includes('lawyer') || 
+            data.message.includes('contact') || data.message.includes('phone')) {
+          setShowAttorneyCard(true);
+        }
       }
 
     } catch (error) {
@@ -158,10 +282,14 @@ export default function AttorneyChatbot() {
   };
 
   const clearConversation = () => {
+    const welcomeMessage = activeTab === 'attorney' 
+      ? '👋 Hello! I\'m your AI legal assistant. I\'m here to help you find the right attorney for your legal needs.\n\nTo get started, please tell me:\n\n1️⃣ **What legal issue are you facing?** (e.g., divorce, personal injury, criminal defense)\n2️⃣ **Where are you located?** (city and state)\n\nI\'ll then search for qualified attorneys in your area who specialize in your specific legal matter.'
+      : '👋 Hello! I\'m LISA (Legal Information Service Assistant). I\'m here to help you analyze call transcripts and provide comprehensive legal information.\n\nTo get started, please paste your call transcript below. I\'ll analyze it and provide you with:\n\n📋 **Call Summary**\n👨‍💼 **Attorney Listings** (with verified contact info)\n📚 **Legal Resources & Guides**\n📄 **Documents & Forms**\n✅ **Next-Step Checklist**\n🏛️ **Court & Agency Contacts**\n\nPlease paste your call transcript and I\'ll help you navigate your legal situation.';
+    
     setMessages([
       {
         role: 'assistant',
-        content: '👋 Hello! I\'m your AI legal assistant. I\'m here to help you find the right attorney for your legal needs.\n\nTo get started, please tell me:\n\n1️⃣ **What legal issue are you facing?** (e.g., divorce, personal injury, criminal defense)\n2️⃣ **Where are you located?** (city and state)\n\nI\'ll then search for qualified attorneys in your area who specialize in your specific legal matter.',
+        content: welcomeMessage,
         timestamp: new Date().toISOString()
       }
     ]);
@@ -169,6 +297,126 @@ export default function AttorneyChatbot() {
     setLegalIssue('');
     setAttorneyResults([]);
     setShowAttorneyCard(false);
+  };
+
+  const resetLisaPrompt = () => {
+    setLisaPrompt(`Identity
+You are LISA (Legal Information Service Assistant). Your role is to help users navigate legal problems by providing accurate legal information, verified resources, attorney listings with phone numbers, practical next steps and guidance.
+
+Important Limitations
+
+You are not an attorney and do not give legal advice or referrals.
+Provide only real, verifiable information from trusted sources.
+Never hallucinate or invent attorneys, resources, or forms.
+Always disclose that information may not be complete or up to date.
+No attorney–client relationship is ever created.
+
+I. Post-Call Email Structure
+
+When preparing the post-call email, follow this exact structure in order:
+
+1. Call Summary
+
+Write a brief paragraph summarizing the user's main legal concern.
+Include their first name and the legal issue identified.
+Note the desired outcome if mentioned.
+
+2. Attorney Listings (Strict Rules)
+
+Perform a real-time search using only verified sources:
+Google, Avvo, Justia, State Bar directories, official court/lawyer referral sites.
+Provide up to 5 attorneys or law firms that:
+Specialize in the legal area discussed
+Are located in or near the user's City → County → Statewide (in that order)
+Explicitly advertise "Free Consultations" (must appear in listing or website)
+Have a verified phone number
+
+Format each entry like this:
+Attorney or Law Firm Name – (555) 123-4567 – "Offers Free Consultation"
+If no verified results:
+ "No verified attorney listings available at this time."
+
+Never fabricate names, phone numbers, or claim free consultation unless explicitly stated.
+
+3. Legal Resources & Guides
+
+Provide up to 5 relevant resources with direct links only.
+Links must be live, direct, and from trusted sources only:
+Government (.gov)
+Court websites
+Nonprofits (Legal Aid, ACLU, NAACP, etc.)
+State/County Bar associations
+If no verified resources:
+ "No verified resources available at this time."
+
+Never include blogs, private law firm marketing, or broken links.
+
+4. Documents & Forms (Optional)
+
+Always provide links to official court or government forms that may be helpful and apply to the Users legal practice area
+Always include:
+Form name + direct link
+Instructions link (if available)
+Filing fees and note or links to fee waivers if available
+
+Example:
+
+"California Answer – Unlawful Detainer (Form UD-105): [official link]"
+"Fee Waiver (Form FW-001): [official link] – Filing fee may apply depending on income. Fee waivers available."
+If no official form exists:
+ "No official court/government forms found."
+If no valid link is available, do not list the document or resource
+Never provide custom drafting or create unofficial forms.
+
+5. Next-Step Checklist
+
+Provide a simple Action List. Example:
+
+Contact 2–3 attorneys from the list within 48 hours.
+Gather relevant documents you may need (lease, pay stubs, police report, etc.).
+Review provided resources and guides to understand your rights.
+Contact your local courthouse or legal aid office for follow-up.
+
+6. Cross-Category Guidance
+
+If the legal issue overlaps categories (e.g., DUI = Criminal + Transportation), include additional resources from those areas.
+
+7. Additional Court & Agency Contacts
+
+Provide nearest courthouse website AND phone number (if available).
+Include relevant state/federal self help resource links (if applicable).
+
+8. Closing & Disclaimer
+
+End every email with:
+
+Best wishes,
+LISA
+Legal Information Service Assistant
+
+Disclaimer:
+This information is provided for general legal information and educational purposes only and may not be accurate, complete, or up to date. We are not responsible for the use or non-use of this information. No attorney–client relationship is created or implied. We do not endorse or guarantee any third-party attorneys or legal providers. Always consult a licensed attorney in your state for legal advice.
+
+II. Safeguards (Must Always Apply)
+
+Never hallucinate results.
+Always provide verified phone numbers and live links.
+Use fallback search scope: City → County → Statewide.
+If nothing is found, state it transparently.
+Resources and forms must be direct links from official or nonprofit sources.
+
+Tone: professional, plain-language, supportive, never legalistic.`);
+  };
+
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    setIsInitialized(false); // Reset initialization to show new welcome message
+    setMessages([]);
+    setUserLocation('');
+    setLegalIssue('');
+    setAttorneyResults([]);
+    setShowAttorneyCard(false);
+    setShowPromptEditor(false);
   };
 
   return (
@@ -190,6 +438,18 @@ export default function AttorneyChatbot() {
             </div>
           </div>
           <div className={styles.headerActions}>
+            {activeTab === 'lisa' && (
+              <button 
+                onClick={() => setShowPromptEditor(!showPromptEditor)} 
+                className={styles.promptButton}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 20H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M16.5 3.5C16.8978 3.10217 17.4374 2.87868 18 2.87868C18.5626 2.87868 19.1022 3.10217 19.5 3.5C19.8978 3.89782 20.1213 4.43739 20.1213 5C20.1213 5.56261 19.8978 6.10217 19.5 6.5L12 14L8 15L9 11L16.5 3.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {showPromptEditor ? 'Hide Prompt' : 'Edit Prompt'}
+              </button>
+            )}
             <button onClick={clearConversation} className={styles.clearButton}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M3 6H5H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -200,6 +460,58 @@ export default function AttorneyChatbot() {
           </div>
         </div>
       </header>
+
+      {/* Tab Navigation */}
+      <div className={styles.tabContainer}>
+        <div className={styles.tabs}>
+          <button
+            className={`${styles.tab} ${activeTab === 'attorney' ? styles.activeTab : ''}`}
+            onClick={() => handleTabChange('attorney')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Attorney Finder
+          </button>
+          <button
+            className={`${styles.tab} ${activeTab === 'lisa' ? styles.activeTab : ''}`}
+            onClick={() => handleTabChange('lisa')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M16 13H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M16 17H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M10 9H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            LISA (Call Transcript)
+          </button>
+        </div>
+      </div>
+
+      {/* Prompt Editor for LISA */}
+      {activeTab === 'lisa' && showPromptEditor && (
+        <div className={styles.promptEditor}>
+          <div className={styles.promptEditorHeader}>
+            <h3>Edit LISA Prompt</h3>
+            <div className={styles.promptEditorActions}>
+              <button onClick={resetLisaPrompt} className={styles.resetButton}>
+                Reset to Original
+              </button>
+              <button onClick={() => setShowPromptEditor(false)} className={styles.closeButton}>
+                Close
+              </button>
+            </div>
+          </div>
+          <textarea
+            value={lisaPrompt}
+            onChange={(e) => setLisaPrompt(e.target.value)}
+            className={styles.promptTextarea}
+            placeholder="Enter the LISA prompt..."
+          />
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className={styles.mainContent}>
@@ -234,7 +546,7 @@ export default function AttorneyChatbot() {
                       )}
                       <div className={styles.messageInfo}>
                         <span className={styles.messageRole}>
-                          {message.role === 'user' ? 'You' : 'Legal AI Assistant'}
+                          {message.role === 'user' ? 'You' : activeTab === 'attorney' ? 'Legal AI Assistant' : 'LISA'}
                         </span>
                         <span className={styles.messageTime}>
                           {new Date(message.timestamp).toLocaleTimeString()}
@@ -292,7 +604,7 @@ export default function AttorneyChatbot() {
                         </svg>
                       </div>
                       <div className={styles.messageInfo}>
-                        <span className={styles.messageRole}>Legal AI Assistant</span>
+                        <span className={styles.messageRole}>{activeTab === 'attorney' ? 'Legal AI Assistant' : 'LISA'}</span>
                         <span className={styles.messageTime}>Typing...</span>
                       </div>
                     </div>
@@ -319,7 +631,9 @@ export default function AttorneyChatbot() {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Describe your legal issue or ask for attorney recommendations..."
+                  placeholder={activeTab === 'attorney' 
+                    ? "Describe your legal issue or ask for attorney recommendations..." 
+                    : "Paste your call transcript here for LISA to analyze..."}
                   className={styles.messageInput}
                   rows={1}
                   disabled={isLoading}
@@ -357,8 +671,8 @@ export default function AttorneyChatbot() {
           </div>
         </div>
 
-        {/* Modern Sidebar */}
-        {showAttorneyCard && (
+        {/* Modern Sidebar - Only show for attorney tab */}
+        {activeTab === 'attorney' && showAttorneyCard && (
           <div className={styles.sidebar}>
             <div className={styles.sidebarHeader}>
               <h3>📋 Quick Info</h3>
