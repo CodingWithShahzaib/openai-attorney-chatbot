@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import styles from './page.module.css';
 import ReactMarkdown from 'react-markdown';
+import { ClientPageRoot } from 'next/dist/client/components/client-page';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -38,6 +39,7 @@ export default function AttorneyChatbot() {
   const [attorneyResults, setAttorneyResults] = useState<AttorneyInfo[]>([]);
   const [showAttorneyCard, setShowAttorneyCard] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [model, setModel] = useState<string>('gpt-4o-search-preview');
   const [lisaPrompt, setLisaPrompt] = useState(`Identity
 You are LISA (Legal Information Service Assistant). Your role is to help users navigate legal problems by providing accurate legal information, verified resources, attorney listings with phone numbers, practical next steps and guidance.
 
@@ -211,11 +213,13 @@ Tone: professional, plain-language, supportive, never legalistic.`);
         ? {
             messages: [...messages, userMessage],
             userLocation,
-            legalIssue
+            legalIssue,
+            model
           }
         : {
             messages: [...messages, userMessage],
-            prompt: lisaPrompt
+            prompt: lisaPrompt,
+            model
           };
 
       const response = await fetch(endpoint, {
@@ -223,6 +227,7 @@ Tone: professional, plain-language, supportive, never legalistic.`);
         headers: {
           'Content-Type': 'application/json',
         },
+        cache: 'no-store',
         body: JSON.stringify(requestBody),
       });
 
@@ -299,6 +304,7 @@ Tone: professional, plain-language, supportive, never legalistic.`);
     setShowAttorneyCard(false);
   };
 
+  console.log('lisaPrompt', lisaPrompt);
   const resetLisaPrompt = () => {
     setLisaPrompt(`Identity
 You are LISA (Legal Information Service Assistant). Your role is to help users navigate legal problems by providing accurate legal information, verified resources, attorney listings with phone numbers, practical next steps and guidance.
@@ -438,6 +444,15 @@ Tone: professional, plain-language, supportive, never legalistic.`);
             </div>
           </div>
           <div className={styles.headerActions}>
+            {/* Model Selector */}
+            <div className={styles.modelSelector}>
+              <label htmlFor="model" className={styles.modelLabel}>Model</label>
+              <select id="model" className={styles.modelSelect} value={model} onChange={(e) => setModel(e.target.value)}>
+                <option value="gpt-4o-search-preview">gpt-4o-search-preview</option>
+                <option value="gpt-4o">gpt-4o</option>
+                <option value="gpt-4o-mini">gpt-4o-mini</option>
+              </select>
+            </div>
             {activeTab === 'lisa' && (
               <button 
                 onClick={() => setShowPromptEditor(!showPromptEditor)} 

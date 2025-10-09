@@ -118,7 +118,7 @@ IMPORTANT: Based on the conversation, you now have both the legal issue and loca
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages } = await request.json();
+    const { messages, model } = await request.json();
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
@@ -135,6 +135,7 @@ export async function POST(request: NextRequest) {
       messageCount: messages.length,
       lastUserMessage: userQuery.substring(0, 100) + (userQuery.length > 100 ? '...' : ''),
       shouldTriggerSearch: shouldTriggerSearch(messages),
+      model: model || 'gpt-4o-search-preview',
     });
 
     // Enhance messages to force search when appropriate
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
 
     // Create completion with search-enabled model
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-search-preview', // Using the search-enabled model
+      model: model || 'gpt-4o-search-preview', // Using the search-enabled model
       messages: enhancedMessages,
       web_search_options: {}, // Enable web search
       max_tokens: 2000,
