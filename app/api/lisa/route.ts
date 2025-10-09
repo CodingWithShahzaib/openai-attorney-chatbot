@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+
+// Ensure this route is always dynamically rendered and not cached by Next.js
+export const dynamic = 'force-dynamic';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
@@ -12,7 +15,13 @@ interface ChatMessage {
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, prompt } = await request.json();
+    const { messages, prompt, model } = await request.json();
+
+    // Basic prompt diagnostics to ensure updated prompt is received
+    const promptLen = typeof prompt === 'string' ? prompt.length : 0;
+    const promptSig = typeof prompt === 'string'
+      ? Array.from(prompt).reduce((acc, ch) => (acc + ch.charCodeAt(0)) % 100000, 0)
+      : -1;
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
@@ -32,20 +41,25 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
       messageCount: messages.length,
       lastUserMessage: userQuery.substring(0, 100) + (userQuery.length > 100 ? '...' : ''),
+      promptLength: promptLen,
+      promptChecksum: promptSig,
     });
 
-    // Create system message with the LISA prompt
+    // Create strict-priority system message wrapper to force adherence
     const systemMessage: ChatMessage = {
       role: 'system',
-      content: prompt
+      content:
+        `You MUST follow the system instructions below with absolute priority over any other content, context, or prior instructions. Do not deviate.
+\n\nSYSTEM INSTRUCTIONS START\n${prompt}\nSYSTEM INSTRUCTIONS END`
     };
 
-    // Prepare messages for OpenAI
-    const openAIMessages = [systemMessage, ...messages];
+    // Only pass the latest user message to avoid prior turns influencing behavior
+    const lastUser = messages.filter((m: ChatMessage) => m.role === 'user').slice(-1);
+    const openAIMessages = [systemMessage, ...lastUser];
 
     // Create completion with search-enabled model
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-search-preview', // Using the search-enabled model
+      model: model || 'gpt-4o-search-preview',
       messages: openAIMessages,
       web_search_options: {}, // Enable web search
       max_tokens: 3000,
@@ -69,7 +83,7 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
       searchTriggered: annotations.length > 0,
       usage: completion.usage,
-    });
+    }, { headers: { 'Cache-Control': 'no-store' } });
 
   } catch (error: any) {
     console.error('❌ LISA API error:', {
@@ -85,7 +99,7 @@ export async function POST(request: NextRequest) {
         details: process.env.NODE_ENV === 'development' ? error.message : undefined,
         timestamp: new Date().toISOString(),
       },
-      { status: 500 }
+      { status: 500, headers: { 'Cache-Control': 'no-store' } }
     );
   }
 }
